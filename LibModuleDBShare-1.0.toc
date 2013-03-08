@@ -4,4 +4,4 @@
 ## Author: Thnan (Jaedenar US-A)
 ## Version: @project-version@
 
-LibStub\LibStub.lua
+LibStub.lua

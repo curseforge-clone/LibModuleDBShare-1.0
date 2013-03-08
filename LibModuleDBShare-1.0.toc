@@ -4,5 +4,7 @@
 ## Author: Thnan (Jaedenar US-A)
 ## Version: @project-version@
 
+## OptionalDeps: LibStub, Ace3, LibDualSpec-1.0
+
 LibStub.lua
 LibModuleDBShare-1.0\LibModuleDBShare-1.0.xml

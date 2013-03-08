@@ -1,0 +1,9 @@
+
+package-as: LibModuleDBShare-1.0
+
+license-output: License.txt
+
+externals:
+  LibStub:
+    url: svn://svn.wowace.com/wow/libstub/mainline/trunk
+    tag: latest

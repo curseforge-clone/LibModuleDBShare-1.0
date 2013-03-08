@@ -1,0 +1,7 @@
+## Interface: 50200
+## Title: @localization(locale="enUS", key="Title")@
+## Notes: @localization(locale="enUS", key="Notes")@
+## Author: Thnan (Jaedenar US-A)
+## Version: @project-version@
+
+LibStub\LibStub.lua

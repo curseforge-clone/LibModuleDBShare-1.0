@@ -3,8 +3,6 @@ package-as: LibModuleDBShare-1.0
 
 license-output: LibModuleDBShare-1.0/License.txt
 
-manual-changelog: Changelog.txt
-
 enable-nolib-creation: no
 
 tools-used:

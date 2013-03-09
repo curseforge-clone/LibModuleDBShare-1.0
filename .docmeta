@@ -1,4 +1,4 @@
 -
   type: luadoc
-  input-file: "LibModuleDBShare-1.0/LibModuleDBShare-1.0.lua
+  input-file: LibModuleDBShare-1.0/LibModuleDBShare-1.0.lua
   output-page: "API"

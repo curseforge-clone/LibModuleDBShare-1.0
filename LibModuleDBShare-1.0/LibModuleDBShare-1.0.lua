@@ -17,10 +17,11 @@ local DBGroup = {};
 --- Creates a new DB group.
 -- @param groupName The name of the new DB group.
 -- @param usesDualSpec True if this group should use LibDualSpec, false otherwise.
+-- @param initialProfile The name of the profile to start with.
 -- @usage
 -- local myAddonDBGroup = LibStub("LibModuleDBShare-1.0"):NewGroup("MyAddonGroupName", true)
 -- @return the new DB group object
-function LibModuleDBShare:NewGroup(groupName, usesDualSpec)
+function LibModuleDBShare:NewGroup(groupName, usesDualSpec, initialProfile)
 	
 end
 

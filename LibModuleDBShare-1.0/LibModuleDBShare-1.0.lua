@@ -10,6 +10,9 @@ local LibModuleDBShare, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not LibModuleDBShare then return end -- No upgrade needed
 
+-- Lua APIs
+local assert = assert;
+
 local AceDB = LibStub("AceDB-3.0");
 
 LibModuleDBShare.groups = LibModuleDBShare.groups or {};
@@ -24,7 +27,8 @@ local DBGroup = {};
 -- local myAddonDBGroup = LibStub("LibModuleDBShare-1.0"):NewGroup("MyAddonGroupName", true)
 -- @return the new DB group object
 function LibModuleDBShare:NewGroup(groupName, usesDualSpec, initialProfile)
-	-- param checks go here
+	assert(type(groupName) == "string", "Usage: LibModuleDBShare:NewGroup(groupName, usesDualSpec, initialProfile): 'groupName' is not a string.");
+	assert(type(LibModuleDBShare.groups[groupName]) == "nil", "LibModuleDBShare:NewGroup(groupName, usesDualSpec, initialProfile): 'groupName' already exists");
 	local group = {}
 	group.name = groupName;
 	group.syncDBTable = {};

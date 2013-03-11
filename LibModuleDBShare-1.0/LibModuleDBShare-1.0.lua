@@ -32,7 +32,7 @@ function LibModuleDBShare:NewGroup(groupName, usesDualSpec, initialProfile)
 	local group = {}
 	group.name = groupName;
 	group.syncDBTable = {};
-	group.syncDB = AceDB:New(group.syncDBTable, nil, true);
+	group.syncDB = AceDB:New(group.syncDBTable, nil, initialProfile);
 	for k, v in pairs(DBGroup) do
 		group[k] = v;
 	end

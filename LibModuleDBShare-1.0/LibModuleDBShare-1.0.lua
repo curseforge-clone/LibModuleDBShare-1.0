@@ -51,8 +51,13 @@ function LibModuleDBShare:NewGroup(groupName, usesDualSpec, initialProfile)
 	group.syncDB = AceDB:New(group.syncDBTable, nil, initialProfile);
 	group.profileOptionsTable = AceDBOptions:GetOptionsTable(group.syncDB, false);
 	AceConfigRegistry:RegisterOptionsTable(groupName.."Profiles", group.profileOptionsTable);
-	AceConfigDialog:AddToBlizOptions(groupName.."Profiles", "Profiles", groupName); -- need to figure out localization
-	-- profile change callbacks
+	AceConfigDialog:AddToBlizOptions(groupName.."Profiles", group.profileOptionsTable.name, groupName);
+	group.members = {};
+	group.syncDB:RegisterCallback(group, "OnNewProfile", "OnNewProfile");
+	group.syncDB:RegisterCallback(group, "OnProfileChanged", "OnProfileChanged");
+	group.syncDB:RegisterCallback(group, "OnProfileDeleted", "OnProfileDeleted");
+	group.syncDB:RegisterCallback(group, "OnProfileCopied", "OnProfileCopied");
+	group.syncDB:RegisterCallback(group, "OnProfileReset", "OnProfileReset");
 	for k, v in pairs(DBGroup) do
 		group[k] = v;
 	end
@@ -75,4 +80,32 @@ end
 -- myAddonDBGroup:AddDB(MyAddon.db)
 function DBGroup:AddDB(db)
 
+end
+
+function DBGroup:OnNewProfile(db, profile)
+	print("New Profile");
+	print(type(profile));
+	print(tostring(profile));
+end
+
+function DBGroup:OnProfileChanged(db, profile)
+	print("Profile Changed");
+	print(type(profile));
+	print(tostring(profile));
+end
+
+function DBGroup:OnProfileDeleted(db, profile)
+	print("Profile Deleted");
+	print(type(profile));
+	print(tostring(profile));
+end
+
+function DBGroup:OnProfileCopied(db, profile)
+	print("Profile Copied");
+	print(type(profile));
+	print(tostring(profile));
+end
+
+function DBGroup:OnProfileReset(db)
+	print("Profile Reset");
 end

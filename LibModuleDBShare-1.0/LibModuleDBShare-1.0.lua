@@ -11,7 +11,7 @@ local LibModuleDBShare, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 if not LibModuleDBShare then return end -- No upgrade needed
 
 -- Lua APIs
-local assert = assert;
+local assert, type, pairs = assert, type, pairs;
 
 -- Required Libraries
 local AceDB = LibStub("AceDB-3.0");
@@ -25,34 +25,48 @@ local DBGroup = {};
 
 --- Creates a new DB group.
 -- @param groupName The name of the new DB group.
+-- @param groupDescription A description of the group to be shown in the root options panel.
+-- @param initialDB The first DB to add to the group.
 -- @param usesDualSpec True if this group should use LibDualSpec, false otherwise. (NYI)
--- @param initialProfile The name of the profile to start with. (Defaults to character-specific)
 -- @usage
 -- local myAddonDBGroup = LibStub("LibModuleDBShare-1.0"):NewGroup("MyAddonGroupName", true)
 -- @return the new DB group object
-function LibModuleDBShare:NewGroup(groupName, usesDualSpec, initialProfile)
-	assert(type(groupName) == "string", "Usage: LibModuleDBShare:NewGroup(groupName, usesDualSpec, initialProfile): 'groupName' must be a string.");
-	assert(type(LibModuleDBShare.groups[groupName]) == "nil", "LibModuleDBShare:NewGroup(groupName, usesDualSpec, initialProfile): 'groupName' already exists");
+function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec)
+	-- verify parameters
+	assert(type(groupName) == "string", "Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'groupName' must be a string.");
+	assert(type(groupDescription) == "string", "Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'groupDescription' must be a string.");
+	assert(type(LibModuleDBShare.groups[groupName]) == "nil", "LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): group '"..groupName.."' already exists");
+	assert(type(initialDB) == "table", "LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'initalDB must be a table.");
+	-- create group
 	local group = {}
 	group.name = groupName;
+	group.members = {};
+	-- create root option panel for group
 	group.rootOptionsTable = {
 		type = "group",
 		name = groupName,
 		args = {
 			text = {
 				type = "description",
-				name = "placeholder text.",
+				name = groupDescription,
 			},
 		},
 	};
 	AceConfigRegistry:RegisterOptionsTable(groupName, group.rootOptionsTable);
 	AceConfigDialog:AddToBlizOptions(groupName);
+	-- create sync DB and profile options page
 	group.syncDBTable = {};
-	group.syncDB = AceDB:New(group.syncDBTable, nil, initialProfile);
+	group.syncDB = AceDB:New(group.syncDBTable, nil, initialDB:GetCurrentProfile());
 	group.profileOptionsTable = AceDBOptions:GetOptionsTable(group.syncDB, false);
 	AceConfigRegistry:RegisterOptionsTable(groupName.."Profiles", group.profileOptionsTable);
 	AceConfigDialog:AddToBlizOptions(groupName.."Profiles", group.profileOptionsTable.name, groupName);
-	group.members = {};
+	-- add all profiles from initialDB to syncDB
+	for i, profile in pairs(initialDB:GetProfiles()) do
+		group.syncDB:SetProfile(profile);
+	end
+	group.syncDB:SetProfile(initialDB:GetCurrentProfile());
+	group.members[initialDB] = true;
+	-- add methods and callbacks
 	for k, v in pairs(DBGroup) do
 		group[k] = v;
 	end

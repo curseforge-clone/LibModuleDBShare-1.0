@@ -60,6 +60,7 @@ function LibModuleDBShare:NewGroup(groupName, usesDualSpec, initialProfile)
 	group.syncDB.RegisterCallback(group, "OnProfileDeleted", "OnProfileDeleted");
 	group.syncDB.RegisterCallback(group, "OnProfileCopied", "OnProfileCopied");
 	group.syncDB.RegisterCallback(group, "OnProfileReset", "OnProfileReset");
+	group.squelchCallbacks = false;
 	LibModuleDBShare.groups[groupName] = group;
 	return group;
 end
@@ -75,11 +76,40 @@ function LibModuleDBShare:GetGroup(groupName)
 end
 
 --- Adds a database to the group.
--- @param db The name of the new DB group.
+-- @param db The database to add.
 -- @usage
 -- myAddonDBGroup:AddDB(MyAddon.db)
 function DBGroup:AddDB(db)
-
+	local syncProfile = self.syncDB:GetCurrentProfile();
+	
+	local shouldDeleteDefault = false; -- if not first DB, then default profile already handled
+	if type(self.profileTimestamp) == "nil" then
+		shouldDeleteDefault = true -- first DB added.. might not have default profile
+		self.profileTimestamp = 0;
+	end
+	self.squelchCallbacks = true;
+	for i, profile in pairs(db:GetProfiles()) do
+		if profile == "Default" then
+			shouldDeleteDefault = false;
+		end
+		self.syncDB:SetProfile(profile);
+	end
+	
+	if db.character.logoutTimestamp > self.profileTimestamp then
+		self.syncDB:SetProfile(db:GetCurrentProfile());
+		self.profileTimestamp = db.character.logoutTimestamp;
+	else
+		self.syncDB:SetProfile(syncProfile);
+	end
+	
+	if shouldDeleteDefault then
+		self.syncDB:DeleteProfile("Default");
+	end
+	self.squelchCallbacks = false;
+	
+	if self.syncDB:GetCurrentProfile() ~= syncProfile then
+		self:OnProfileChanged("OnProfileChanged", self.syncDB, self.syncDB:GetCurrentProfile());
+	end
 end
 
 -- callback handlers (new profiles are handled by OnProfileChanged)

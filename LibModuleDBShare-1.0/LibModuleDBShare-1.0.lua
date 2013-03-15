@@ -53,14 +53,14 @@ function LibModuleDBShare:NewGroup(groupName, usesDualSpec, initialProfile)
 	AceConfigRegistry:RegisterOptionsTable(groupName.."Profiles", group.profileOptionsTable);
 	AceConfigDialog:AddToBlizOptions(groupName.."Profiles", group.profileOptionsTable.name, groupName);
 	group.members = {};
-	group.syncDB:RegisterCallback(group, "OnNewProfile", "OnNewProfile");
-	group.syncDB:RegisterCallback(group, "OnProfileChanged", "OnProfileChanged");
-	group.syncDB:RegisterCallback(group, "OnProfileDeleted", "OnProfileDeleted");
-	group.syncDB:RegisterCallback(group, "OnProfileCopied", "OnProfileCopied");
-	group.syncDB:RegisterCallback(group, "OnProfileReset", "OnProfileReset");
 	for k, v in pairs(DBGroup) do
 		group[k] = v;
 	end
+	group.syncDB.RegisterCallback(group, "OnProfileChanged", "OnProfileChanged");
+	group.syncDB.RegisterCallback(group, "OnProfileDeleted", "OnProfileDeleted");
+	group.syncDB.RegisterCallback(group, "OnProfileCopied", "OnProfileCopied");
+	group.syncDB.RegisterCallback(group, "OnProfileReset", "OnProfileReset");
+	LibModuleDBShare.groups[groupName] = group;
 	return group;
 end
 
@@ -82,30 +82,30 @@ function DBGroup:AddDB(db)
 
 end
 
-function DBGroup:OnNewProfile(db, profile)
-	print("New Profile");
-	print(type(profile));
-	print(tostring(profile));
-end
+-- callback handlers (new profiles are handled by OnProfileChanged)
 
-function DBGroup:OnProfileChanged(db, profile)
+function DBGroup:OnProfileChanged(callback, db, profile)
 	print("Profile Changed");
+	print(self.name);
 	print(type(profile));
 	print(tostring(profile));
 end
 
-function DBGroup:OnProfileDeleted(db, profile)
+function DBGroup:OnProfileDeleted(callback, db, profile)
 	print("Profile Deleted");
+	print(self.name);
 	print(type(profile));
 	print(tostring(profile));
 end
 
-function DBGroup:OnProfileCopied(db, profile)
+function DBGroup:OnProfileCopied(callback, db, profile)
 	print("Profile Copied");
+	print(self.name);
 	print(type(profile));
 	print(tostring(profile));
 end
 
-function DBGroup:OnProfileReset(db)
+function DBGroup:OnProfileReset(callback, db)
 	print("Profile Reset");
+	print(self.name);
 end

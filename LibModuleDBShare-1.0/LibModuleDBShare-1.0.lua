@@ -35,7 +35,7 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 	-- verify parameters
 	assert(type(groupName) == "string", "Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'groupName' must be a string.");
 	assert(type(groupDescription) == "string", "Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'groupDescription' must be a string.");
-	assert(type(LibModuleDBShare.groups[groupName]) == "nil", "LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): group '"..groupName.."' already exists");
+	assert(type(LibModuleDBShare.groups[groupName]) == "nil", "LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): group '"..groupName.."' already exists.");
 	assert(type(initialDB) == "table", "LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'initalDB must be a table.");
 	-- create group
 	local group = {}
@@ -66,6 +66,11 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 	end
 	group.syncDB:SetProfile(initialDB:GetCurrentProfile());
 	group.members[initialDB] = true;
+	if type(initialDB.character.logoutTimestamp) == "number" then
+		group.profileTimestamp = initialDB.character.logoutTimestamp;
+	else
+		group.profileTimestamp = 0;
+	end
 	-- add methods and callbacks
 	for k, v in pairs(DBGroup) do
 		group[k] = v;
@@ -85,45 +90,37 @@ end
 -- local myAddonDBGroup = LibStub("LibModuleDBShare-1.0"):GetGroup("MyAddonGroupName")
 -- @return the DB group object, or nil if not found
 function LibModuleDBShare:GetGroup(groupName)
-	assert(type(groupName) == "string", "Usage: LibModuleDBShare:GetGroup(groupName): 'groupName' must be a string");
+	assert(type(groupName) == "string", "Usage: LibModuleDBShare:GetGroup(groupName): 'groupName' must be a string.");
 	return LibModuleDBShare.groups[groupName];
 end
 
 --- Adds a database to the group.
--- @param db The database to add.
+-- @param newDB The database to add.
 -- @usage
 -- myAddonDBGroup:AddDB(MyAddon.db)
-function DBGroup:AddDB(db)
+function DBGroup:AddDB(newDB)
+	-- verify parameters
+	assert(type(newDB) == "table", "Usage: DBGroup:AddDB(newDB): 'newDB' must be a table.");
+	assert(type(self.members[newDB]) == "nil", "DBGroup:AddDB(newDB): 'newDB' is already a member of DBGroup.");
+	-- record current profile
 	local syncProfile = self.syncDB:GetCurrentProfile();
-	
-	local shouldDeleteDefault = false; -- if not first DB, then default profile already handled
-	if type(self.profileTimestamp) == "nil" then
-		shouldDeleteDefault = true -- first DB added.. might not have default profile
-		self.profileTimestamp = 0;
-	end
+	-- add new profiles to syncDB
 	self.squelchCallbacks = true;
-	for i, profile in pairs(db:GetProfiles()) do
-		if profile == "Default" then
-			shouldDeleteDefault = false;
-		end
+	for i, profile in pairs(newDB:GetProfiles()) do
 		self.syncDB:SetProfile(profile);
 	end
-	
-	if db.character.logoutTimestamp > self.profileTimestamp then
-		self.syncDB:SetProfile(db:GetCurrentProfile());
-		self.profileTimestamp = db.character.logoutTimestamp;
+	-- set current profile based on timestamps
+	if type(newDB.character.logoutTimestamp) == "number" and newDB.character.logoutTimestamp > self.profileTimestamp then
+		self.squelchCallbacks = false;
+		self.syncDB:SetProfile(newDB:GetCurrentProfile());
+		self.profileTimestamp = newDB.character.logoutTimestamp;
 	else
 		self.syncDB:SetProfile(syncProfile);
+		newDB:SetProfile(syncProfile);
+		self.squelchCallbacks = false;
 	end
-	
-	if shouldDeleteDefault then
-		self.syncDB:DeleteProfile("Default");
-	end
-	self.squelchCallbacks = false;
-	
-	if self.syncDB:GetCurrentProfile() ~= syncProfile then
-		self:OnProfileChanged("OnProfileChanged", self.syncDB, self.syncDB:GetCurrentProfile());
-	end
+	-- add to members list
+	self.members[newDB] = true;
 end
 
 -- callback handlers (new profiles are handled by OnProfileChanged)

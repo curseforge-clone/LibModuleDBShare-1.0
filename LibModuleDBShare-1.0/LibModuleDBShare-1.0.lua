@@ -11,7 +11,7 @@ local LibModuleDBShare, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 if not LibModuleDBShare then return end -- No upgrade needed
 
 -- Lua APIs
-local assert, type, pairs = assert, type, pairs;
+local assert, type, pairs, time = assert, type, pairs, time;
 
 -- Required Libraries
 local AceDB = LibStub("AceDB-3.0");
@@ -127,32 +127,43 @@ end
 
 -- callback handlers (new profiles are handled by OnProfileChanged)
 
-function DBGroup:OnProfileChanged(callback, db, profile)
-	print("Profile Changed");
-	print(self.name);
-	print(type(profile));
-	print(tostring(profile));
+function DBGroup:OnProfileChanged(callback, syncDB, profile)
+	print("Group "..self.name..": Profile Changed to "..profile);
+	if not self.squelchCallbacks then
+		for db, _ in pairs(self.members) do
+			db:ChangeProfile(profile);
+		end
+	else
+		print("   squelched");
+	end
 end
 
-function DBGroup:OnProfileDeleted(callback, db, profile)
-	print("Profile Deleted");
-	print(self.name);
-	print(type(profile));
-	print(tostring(profile));
+function DBGroup:OnProfileDeleted(callback, syncDB, profile)
+	print("Group "..self.name..": Profile Deleted: "..profile);
+	for db, _ in pairs(self.members) do
+		db:DeleteProfile(profile, true);
+	end
 end
 
-function DBGroup:OnProfileCopied(callback, db, profile)
-	print("Profile Copied");
-	print(self.name);
-	print(type(profile));
-	print(tostring(profile));
+function DBGroup:OnProfileCopied(callback, syncDB, profile)
+	print("Group "..self.name..": Profile Copied from "..profile);
+	for db, _ in pairs(self.members) do
+		db:CopyProfile(profile, true);
+	end
 end
 
-function DBGroup:OnProfileReset(callback, db)
-	print("Profile Reset");
-	print(self.name);
+function DBGroup:OnProfileReset(callback, syncDB)
+	print("Group "..self.name..": Profile Reset");
+	for db, _ in pairs(self.members) do
+		db:ResetProfile(false, false);
+	end
 end
+
+local timestamp = nil;
 
 function DBGroup:OnDatabaseShutdown(callback, db)
-	print("Database Shutdown");
+	if not timestamp then -- ensures uniform timestamps so 
+		timestamp = time();
+	end
+	db.char.logoutTimestamp = timestamp;
 end

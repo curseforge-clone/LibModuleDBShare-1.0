@@ -128,32 +128,26 @@ end
 -- callback handlers (new profiles are handled by OnProfileChanged)
 
 function DBGroup:OnProfileChanged(callback, syncDB, profile)
-	print("Group "..self.name..": Profile Changed to "..profile);
 	if not self.squelchCallbacks then
 		for db, _ in pairs(self.members) do
-			db:ChangeProfile(profile);
+			db:SetProfile(profile);
 		end
-	else
-		print("   squelched");
 	end
 end
 
 function DBGroup:OnProfileDeleted(callback, syncDB, profile)
-	print("Group "..self.name..": Profile Deleted: "..profile);
 	for db, _ in pairs(self.members) do
 		db:DeleteProfile(profile, true);
 	end
 end
 
 function DBGroup:OnProfileCopied(callback, syncDB, profile)
-	print("Group "..self.name..": Profile Copied from "..profile);
 	for db, _ in pairs(self.members) do
 		db:CopyProfile(profile, true);
 	end
 end
 
 function DBGroup:OnProfileReset(callback, syncDB)
-	print("Group "..self.name..": Profile Reset");
 	for db, _ in pairs(self.members) do
 		db:ResetProfile(false, false);
 	end

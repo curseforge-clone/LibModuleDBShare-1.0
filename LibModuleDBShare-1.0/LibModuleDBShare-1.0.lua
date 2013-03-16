@@ -66,8 +66,8 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 	end
 	group.syncDB:SetProfile(initialDB:GetCurrentProfile());
 	group.members[initialDB] = true;
-	if type(initialDB.character.logoutTimestamp) == "number" then
-		group.profileTimestamp = initialDB.character.logoutTimestamp;
+	if type(initialDB.char.logoutTimestamp) == "number" then
+		group.profileTimestamp = initialDB.char.logoutTimestamp;
 	else
 		group.profileTimestamp = 0;
 	end
@@ -79,6 +79,7 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 	group.syncDB.RegisterCallback(group, "OnProfileDeleted", "OnProfileDeleted");
 	group.syncDB.RegisterCallback(group, "OnProfileCopied", "OnProfileCopied");
 	group.syncDB.RegisterCallback(group, "OnProfileReset", "OnProfileReset");
+	initialDB.RegisterCallback(group, "OnDatabaseShutdown", "OnDatabaseShutdown");
 	group.squelchCallbacks = false;
 	LibModuleDBShare.groups[groupName] = group;
 	return group;
@@ -110,7 +111,7 @@ function DBGroup:AddDB(newDB)
 		self.syncDB:SetProfile(profile);
 	end
 	-- set current profile based on timestamps
-	if type(newDB.character.logoutTimestamp) == "number" and newDB.character.logoutTimestamp > self.profileTimestamp then
+	if type(newDB.char.logoutTimestamp) == "number" and newDB.char.logoutTimestamp > self.profileTimestamp then
 		self.squelchCallbacks = false;
 		self.syncDB:SetProfile(newDB:GetCurrentProfile());
 		self.profileTimestamp = newDB.character.logoutTimestamp;
@@ -121,6 +122,7 @@ function DBGroup:AddDB(newDB)
 	end
 	-- add to members list
 	self.members[newDB] = true;
+	newDB.RegisterCallback(self, "OnDatabaseShutdown", "OnDatabaseShutdown");
 end
 
 -- callback handlers (new profiles are handled by OnProfileChanged)
@@ -149,4 +151,8 @@ end
 function DBGroup:OnProfileReset(callback, db)
 	print("Profile Reset");
 	print(self.name);
+end
+
+function DBGroup:OnDatabaseShutdown(callback, db)
+	print("Database Shutdown");
 end

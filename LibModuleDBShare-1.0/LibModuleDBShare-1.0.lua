@@ -10,8 +10,11 @@ local LibModuleDBShare, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not LibModuleDBShare then return end -- No upgrade needed
 
--- Lua APIs
+-- Lua functions
 local error, type, pairs, time = error, type, pairs, time;
+
+-- Blizzard functions
+local GetActiveSpecGroup = GetActiveSpecGroup;
 
 -- Required Libraries
 local AceDB = LibStub("AceDB-3.0");
@@ -71,8 +74,11 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 	group.syncDB = AceDB:New(group.syncDBTable, nil, initialDB:GetCurrentProfile());
 	group.profileOptionsTable = AceDBOptions:GetOptionsTable(group.syncDB, false);
 	if usesDualSpec then
+		group.usesDualSpec = true;
 		LibDualSpec:EnhanceDatabase(group.syncDB, groupName);
 		LibDualSpec:EnhanceOptions(group.profileOptionsTable, group.syncDB);
+	else
+		group.usesDualSpec = false;
 	end
 	AceConfigRegistry:RegisterOptionsTable(groupName.."Profiles", group.profileOptionsTable);
 	AceConfigDialog:AddToBlizOptions(groupName.."Profiles", group.profileOptionsTable.name, groupName);
@@ -83,17 +89,20 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 	-- load profile info from initialDB
 	group.syncDB:SetProfile(initialDB:GetCurrentProfile());
 	group.members[initialDB] = initialDB:GetNamespace(MAJOR, true) or initialDB:RegisterNamespace(MAJOR);
-	if type(group.members[initialDB].char.logoutTimestamp) == "number" then
-		group.profileTimestamp = group.members[initialDB].char.logoutTimestamp;
+	local storedData = group.members[initialDB].char;
+	if type(storedData.logoutTimestamp) == "number" then
+		group.profileTimestamp = storedData.logoutTimestamp;
 	else
 		group.profileTimestamp = 0;
 	end
-	if usesDualSpec then
-		local dualSpecNamespace = group.syncDB:GetNamespace("LibDualSpec-1.0");
-		dualSpecNamespace.char.profile = group.members[initialDB].char.profile;
-		dualSpecNamespace.char.enabled = group.members[initialDB].char.enabled;
-		dualSpecNamespace.char.specGroup = group.members[initialDB].char.specGroup;
-		group.syncDB:CheckDualSpecState();
+	if usesDualSpec and storedData.altProfile then
+		group.syncDB:SetDualSpecProfile(storedData.altProfile);
+		group.syncDB:SetDualSpecEnabled(storedData.dualSpecEnabled);
+		if storedData.dualSpecEnabled and storedData.activeSpecGroup ~= GetActiveSpecGroup() then
+			group.syncDB:SetDualSpecProfile(group.syncDB:GetCurrentProfile());
+			group.syncDB:SetProfile(storedData.altProfile);
+			initialDB:SetProfile(storedData.altProfile);
+		end
 	end
 	-- add methods and callbacks
 	for k, v in pairs(DBGroup) do
@@ -142,16 +151,19 @@ function DBGroup:AddDB(newDB)
 	end
 	-- set current profile based on timestamps
 	local namespace = newDB:GetNamespace(MAJOR, true) or newDB:RegisterNamespace(MAJOR);
-	if type(namespace.char.logoutTimestamp) == "number" and namespace.char.logoutTimestamp > self.profileTimestamp then
+	local storedData = namespace.char;
+	if type(storedData.logoutTimestamp) == "number" and storedData.logoutTimestamp > self.profileTimestamp then
 		self.squelchCallbacks = false;
 		self.syncDB:SetProfile(newDB:GetCurrentProfile());
-		self.profileTimestamp = namespace.character.logoutTimestamp;
-		local dualSpecNamespace = self.syncDB:GetNamespace("LibDualSpec-1.0", true);
-		if dualSpecNamespace then
-			dualSpecNamespace.char.profile = namespace.char.profile;
-			dualSpecNamespace.char.enabled = namespace.char.enabled;
-			dualSpecNamespace.char.specGroup = namespace.char.specGroup;
-			group.syncDB:CheckDualSpecState();
+		self.profileTimestamp = storedData.logoutTimestamp;
+		if self.usesDualSpec and storedData.altProfile then
+			self.syncDB:SetDualSpecProfile(storedData.altProfile);
+			self.syncDB:SetDualSpecEnabled(storedData.dualSpecEnabled);
+			if storedData.dualSpecEnabled and storedData.activeSpecGroup ~= GetActiveSpecGroup() then
+				self.syncDB:SetDualSpecProfile(self.syncDB:GetCurrentProfile());
+				self.syncDB:SetProfile(storedData.altProfile);
+				newDB:SetProfile(storedData.altProfile);
+			end
 		end
 	else
 		self.syncDB:SetProfile(syncProfile);
@@ -191,16 +203,15 @@ function DBGroup:OnProfileReset(callback, syncDB)
 	end
 end
 
-local profile = nil;
-local enabled = nil;
-local specGroup = nil;
+local altProfile = nil;
+local dualSpecEnabled = nil;
+local activeSpecGroup = nil;
 
 function DBGroup:OnSyncShutdown(callback, syncDB)
-	if not profile then
-		local dualSpecNamespace = syncDB:GetNamespace("LibDualSpec-1.0");
-		profile = dualSpecNamespace.char.profile;
-		enabled = dualSpecNamespace.char.enabled;
-		specGroup = dualSpecNamespace.char.specGroup;
+	if self.usesDualSpec and not altProfile then
+		altProfile = syncDB:GetDualSpecProfile();
+		dualSpecEnabled = syncDB:IsDualSpecEnabled();
+		activeSpecGroup = GetActiveSpecGroup();
 	end
 end
 
@@ -210,14 +221,15 @@ function DBGroup:OnMemberShutdown(callback, db)
 	if not timestamp then	-- ensure uniform timestamps to minimize
 		timestamp = time();	-- calls to SetProfile in NewGroup
 	end
-	if not profile then
-		local dualSpecNamespace = syncDB:GetNamespace("LibDualSpec-1.0");
-		profile = dualSpecNamespace.char.profile;
-		enabled = dualSpecNamespace.char.enabled;
-		specGroup = dualSpecNamespace.char.specGroup;
+	if self.usesDualSpec then
+		if not altProfile then
+			altProfile = self.syncDB:GetDualSpecProfile();
+			dualSpecEnabled = self.syncDB:IsDualSpecEnabled();
+			activeSpecGroup = GetActiveSpecGroup();
+		end
+		self.members[db].char.logoutTimestamp = timestamp;
+		self.members[db].char.altProfile = altProfile;
+		self.members[db].char.dualSpecEnabled = dualSpecEnabled;
+		self.members[db].char.activeSpecGroup = activeSpecGroup;
 	end
-	self.members[db].char.logoutTimestamp = timestamp;
-	self.members[db].char.profile = profile;
-	self.members[db].char.enabled = enabled;
-	self.members[db].char.specGroup = specGroup;
 end

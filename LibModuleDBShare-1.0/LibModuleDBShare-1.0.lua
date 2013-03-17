@@ -11,7 +11,7 @@ local LibModuleDBShare, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 if not LibModuleDBShare then return end -- No upgrade needed
 
 -- Lua APIs
-local assert, type, pairs, time = assert, type, pairs, time;
+local error, type, pairs, time = error, type, pairs, time;
 
 -- Required Libraries
 local AceDB = LibStub("AceDB-3.0");
@@ -33,10 +33,15 @@ local DBGroup = {};
 -- @return the new DB group object
 function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec)
 	-- verify parameters
-	assert(type(groupName) == "string", "Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'groupName' must be a string.");
-	assert(type(groupDescription) == "string", "Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'groupDescription' must be a string.");
-	assert(type(LibModuleDBShare.groups[groupName]) == "nil", "LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): group '"..groupName.."' already exists.");
-	assert(type(initialDB) == "table", "LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'initalDB must be a table.");
+	if type(groupName) ~= "string" then
+		error("Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'groupName' must be a string.", 2);
+	elseif type(groupDescription) ~= "string" then
+		error("Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'groupDescription' must be a string.", 2);
+	elseif type(LibModuleDBShare.groups[groupName]) ~= "nil" then
+		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): group '"..groupName.."' already exists.", 2);
+	elseif type(initialDB) ~= "table" or not AceDB.db_registry[initial] then
+		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'initalDB must be an AceDB-3.0 database.", 2);
+	end
 	-- create group
 	local group = {}
 	group.name = groupName;
@@ -101,8 +106,11 @@ end
 -- myAddonDBGroup:AddDB(MyAddon.db)
 function DBGroup:AddDB(newDB)
 	-- verify parameters
-	assert(type(newDB) == "table", "Usage: DBGroup:AddDB(newDB): 'newDB' must be a table.");
-	assert(type(self.members[newDB]) == "nil", "DBGroup:AddDB(newDB): 'newDB' is already a member of DBGroup.");
+	if type(newDB) ~= "table" or not AceDB.db_registry[newDB] then
+		error("Usage: DBGroup:AddDB(newDB): 'newDB' must be a table.", 2);
+	elseif type(self.members[newDB]) ~= "nil" then
+		error("DBGroup:AddDB(newDB): 'newDB' is already a member of DBGroup.", 2);
+	end
 	-- record current profile
 	local syncProfile = self.syncDB:GetCurrentProfile();
 	-- add new profiles to syncDB

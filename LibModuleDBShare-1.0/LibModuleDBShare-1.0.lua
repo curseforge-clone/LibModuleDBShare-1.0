@@ -19,6 +19,9 @@ local AceDBOptions = LibStub("AceDBOptions-3.0");
 local AceConfigRegistry = LibStub("AceConfigRegistry-3.0");
 local AceConfigDialog = LibStub("AceConfigDialog-3.0");
 
+-- Optional Libraries
+local LibDualSpec = LibStub("LibDualSpec-1.0", true);
+
 LibModuleDBShare.groups = LibModuleDBShare.groups or {};
 
 local DBGroup = {};
@@ -27,7 +30,7 @@ local DBGroup = {};
 -- @param groupName The name of the new DB group.
 -- @param groupDescription A description of the group to be shown in the root options panel.
 -- @param initialDB The first DB to add to the group.
--- @param usesDualSpec True if this group should use LibDualSpec, false otherwise. (NYI)
+-- @param usesDualSpec True if this group should use LibDualSpec, false otherwise.
 -- @usage
 -- local myAddonDBGroup = LibStub("LibModuleDBShare-1.0"):NewGroup("MyAddonGroupName", true)
 -- @return the new DB group object
@@ -41,6 +44,10 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): group '"..groupName.."' already exists.", 2);
 	elseif type(initialDB) ~= "table" or not AceDB.db_registry[initialDB] then
 		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'initalDB' must be an AceDB-3.0 database.", 2);
+	elseif type(usesDualSpec) ~= "boolean" and type(usesDualSpec) ~= "nil" then
+		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'usesDualSpec' must be a boolean or nil.", 2);
+	elseif usesDualSpec and not LibDualSpec then
+		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'usesDualSpec' cannot be true without LibDualSpec-1.0 installed.", 2);
 	end
 	-- create group
 	local group = {}
@@ -63,18 +70,30 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 	group.syncDBTable = {};
 	group.syncDB = AceDB:New(group.syncDBTable, nil, initialDB:GetCurrentProfile());
 	group.profileOptionsTable = AceDBOptions:GetOptionsTable(group.syncDB, false);
+	if usesDualSpec then
+		LibDualSpec:EnhanceDatabase(group.syncDB, groupName);
+		LibDualSpec:EnhanceOptions(group.profileOptionsTable, group.syncDB);
+	end
 	AceConfigRegistry:RegisterOptionsTable(groupName.."Profiles", group.profileOptionsTable);
 	AceConfigDialog:AddToBlizOptions(groupName.."Profiles", group.profileOptionsTable.name, groupName);
 	-- add all profiles from initialDB to syncDB
 	for i, profile in pairs(initialDB:GetProfiles()) do
 		group.syncDB:SetProfile(profile);
 	end
+	-- load profile info from initialDB
 	group.syncDB:SetProfile(initialDB:GetCurrentProfile());
 	group.members[initialDB] = initialDB:GetNamespace(MAJOR, true) or initialDB:RegisterNamespace(MAJOR);
 	if type(group.members[initialDB].char.logoutTimestamp) == "number" then
 		group.profileTimestamp = group.members[initialDB].char.logoutTimestamp;
 	else
 		group.profileTimestamp = 0;
+	end
+	if usesDualSpec then
+		local dualSpecNamespace = group.syncDB:GetNamespace("LibDualSpec-1.0");
+		dualSpecNamespace.char.profile = group.members[initialDB].char.profile;
+		dualSpecNamespace.char.enabled = group.members[initialDB].char.enabled;
+		dualSpecNamespace.char.specGroup = group.members[initialDB].char.specGroup;
+		group.syncDB:CheckDualSpecState();
 	end
 	-- add methods and callbacks
 	for k, v in pairs(DBGroup) do
@@ -84,7 +103,8 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 	group.syncDB.RegisterCallback(group, "OnProfileDeleted", "OnProfileDeleted");
 	group.syncDB.RegisterCallback(group, "OnProfileCopied", "OnProfileCopied");
 	group.syncDB.RegisterCallback(group, "OnProfileReset", "OnProfileReset");
-	initialDB.RegisterCallback(group, "OnDatabaseShutdown", "OnDatabaseShutdown");
+	group.syncDB.RegisterCallback(group, "OnDatabaseShutdown", "OnSyncShutdown");
+	initialDB.RegisterCallback(group, "OnDatabaseShutdown", "OnMemberShutdown");
 	group.squelchCallbacks = false;
 	LibModuleDBShare.groups[groupName] = group;
 	return group;
@@ -126,6 +146,13 @@ function DBGroup:AddDB(newDB)
 		self.squelchCallbacks = false;
 		self.syncDB:SetProfile(newDB:GetCurrentProfile());
 		self.profileTimestamp = namespace.character.logoutTimestamp;
+		local dualSpecNamespace = self.syncDB:GetNamespace("LibDualSpec-1.0", true);
+		if dualSpecNamespace then
+			dualSpecNamespace.char.profile = namespace.char.profile;
+			dualSpecNamespace.char.enabled = namespace.char.enabled;
+			dualSpecNamespace.char.specGroup = namespace.char.specGroup;
+			group.syncDB:CheckDualSpecState();
+		end
 	else
 		self.syncDB:SetProfile(syncProfile);
 		newDB:SetProfile(syncProfile);
@@ -133,7 +160,7 @@ function DBGroup:AddDB(newDB)
 	end
 	-- add to members list
 	self.members[newDB] = namespace;
-	newDB.RegisterCallback(self, "OnDatabaseShutdown", "OnDatabaseShutdown");
+	newDB.RegisterCallback(self, "OnDatabaseShutdown", "OnMemberShutdown");
 end
 
 -- callback handlers (new profiles are handled by OnProfileChanged)
@@ -164,11 +191,33 @@ function DBGroup:OnProfileReset(callback, syncDB)
 	end
 end
 
+local profile = nil;
+local enabled = nil;
+local specGroup = nil;
+
+function DBGroup:OnSyncShutdown(callback, syncDB)
+	if not profile then
+		local dualSpecNamespace = syncDB:GetNamespace("LibDualSpec-1.0");
+		profile = dualSpecNamespace.char.profile;
+		enabled = dualSpecNamespace.char.enabled;
+		specGroup = dualSpecNamespace.char.specGroup;
+	end
+end
+
 local timestamp = nil;
 
-function DBGroup:OnDatabaseShutdown(callback, db)
+function DBGroup:OnMemberShutdown(callback, db)
 	if not timestamp then	-- ensure uniform timestamps to minimize
 		timestamp = time();	-- calls to SetProfile in NewGroup
 	end
+	if not profile then
+		local dualSpecNamespace = syncDB:GetNamespace("LibDualSpec-1.0");
+		profile = dualSpecNamespace.char.profile;
+		enabled = dualSpecNamespace.char.enabled;
+		specGroup = dualSpecNamespace.char.specGroup;
+	end
 	self.members[db].char.logoutTimestamp = timestamp;
+	self.members[db].char.profile = profile;
+	self.members[db].char.enabled = enabled;
+	self.members[db].char.specGroup = specGroup;
 end

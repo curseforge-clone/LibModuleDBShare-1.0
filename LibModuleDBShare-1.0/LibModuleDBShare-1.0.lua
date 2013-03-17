@@ -39,8 +39,8 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 		error("Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'groupDescription' must be a string.", 2);
 	elseif type(LibModuleDBShare.groups[groupName]) ~= "nil" then
 		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): group '"..groupName.."' already exists.", 2);
-	elseif type(initialDB) ~= "table" or not AceDB.db_registry[initial] then
-		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'initalDB must be an AceDB-3.0 database.", 2);
+	elseif type(initialDB) ~= "table" or not AceDB.db_registry[initialDB] then
+		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'initalDB' must be an AceDB-3.0 database.", 2);
 	end
 	-- create group
 	local group = {}
@@ -70,9 +70,9 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 		group.syncDB:SetProfile(profile);
 	end
 	group.syncDB:SetProfile(initialDB:GetCurrentProfile());
-	group.members[initialDB] = true;
-	if type(initialDB.char.logoutTimestamp) == "number" then
-		group.profileTimestamp = initialDB.char.logoutTimestamp;
+	group.members[initialDB] = initialDB:GetNamespace(MAJOR, true) or initialDB:RegisterNamespace(MAJOR);
+	if type(group.members[initialDB].char.logoutTimestamp) == "number" then
+		group.profileTimestamp = group.members[initialDB].char.logoutTimestamp;
 	else
 		group.profileTimestamp = 0;
 	end
@@ -96,7 +96,9 @@ end
 -- local myAddonDBGroup = LibStub("LibModuleDBShare-1.0"):GetGroup("MyAddonGroupName")
 -- @return the DB group object, or nil if not found
 function LibModuleDBShare:GetGroup(groupName)
-	assert(type(groupName) == "string", "Usage: LibModuleDBShare:GetGroup(groupName): 'groupName' must be a string.");
+	if type(groupName) ~= "string" then
+		error("Usage: LibModuleDBShare:GetGroup(groupName): 'groupName' must be a string.", 2);
+	end
 	return LibModuleDBShare.groups[groupName];
 end
 
@@ -119,17 +121,18 @@ function DBGroup:AddDB(newDB)
 		self.syncDB:SetProfile(profile);
 	end
 	-- set current profile based on timestamps
-	if type(newDB.char.logoutTimestamp) == "number" and newDB.char.logoutTimestamp > self.profileTimestamp then
+	local namespace = newDB:GetNamespace(MAJOR, true) or newDB:RegisterNamespace(MAJOR);
+	if type(namespace.char.logoutTimestamp) == "number" and namespace.char.logoutTimestamp > self.profileTimestamp then
 		self.squelchCallbacks = false;
 		self.syncDB:SetProfile(newDB:GetCurrentProfile());
-		self.profileTimestamp = newDB.character.logoutTimestamp;
+		self.profileTimestamp = namespace.character.logoutTimestamp;
 	else
 		self.syncDB:SetProfile(syncProfile);
 		newDB:SetProfile(syncProfile);
 		self.squelchCallbacks = false;
 	end
 	-- add to members list
-	self.members[newDB] = true;
+	self.members[newDB] = namespace;
 	newDB.RegisterCallback(self, "OnDatabaseShutdown", "OnDatabaseShutdown");
 end
 
@@ -164,8 +167,8 @@ end
 local timestamp = nil;
 
 function DBGroup:OnDatabaseShutdown(callback, db)
-	if not timestamp then -- ensures uniform timestamps so 
-		timestamp = time();
+	if not timestamp then	-- ensure uniform timestamps to minimize
+		timestamp = time();	-- calls to SetProfile in NewGroup
 	end
-	db.char.logoutTimestamp = timestamp;
+	self.members[db].char.logoutTimestamp = timestamp;
 end

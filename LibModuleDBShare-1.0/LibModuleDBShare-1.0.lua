@@ -41,13 +41,15 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 	elseif type(groupDescription) ~= "string" then
 		error("Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'groupDescription' must be a string.", 2);
 	elseif type(LibModuleDBShare.groups[groupName]) ~= "nil" then
-		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): group '"..groupName.."' already exists.", 2);
+		error("Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): group '"..groupName.."' already exists.", 2);
 	elseif type(initialDB) ~= "table" or not AceDB.db_registry[initialDB] then
-		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'initalDB' must be an AceDB-3.0 database.", 2);
+		error("Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'initialDB' must be an AceDB-3.0 database.", 2);
+	elseif initialDB.parent then
+		error("Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'initialDB' must not be a namespace.", 2)
 	elseif type(usesDualSpec) ~= "boolean" and type(usesDualSpec) ~= "nil" then
-		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'usesDualSpec' must be a boolean or nil.", 2);
+		error("Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'usesDualSpec' must be a boolean or nil.", 2);
 	elseif usesDualSpec and not LibDualSpec then
-		error("LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'usesDualSpec' cannot be true without LibDualSpec-1.0 installed.", 2);
+		error("Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'usesDualSpec' cannot be true without LibDualSpec-1.0 installed.", 2);
 	end
 	-- create group
 	local group = {}
@@ -133,9 +135,16 @@ end
 function DBGroup:AddDB(newDB)
 	-- verify parameters
 	if type(newDB) ~= "table" or not AceDB.db_registry[newDB] then
-		error("Usage: DBGroup:AddDB(newDB): 'newDB' must be a table.", 2);
+		error("Usage: DBGroup:AddDB(newDB): 'newDB' must be an AceDB-3.0 database.", 2);
+	elseif newDB.parent then
+		error("Usage: DBGroup:AddDB(newDB): 'newDB' must not be a namespace.", 2)
 	elseif type(self.members[newDB]) ~= "nil" then
-		error("DBGroup:AddDB(newDB): 'newDB' is already a member of DBGroup.", 2);
+		error("Usage: DBGroup:AddDB(newDB): 'newDB' is already a member of DBGroup.", 2);
+	end
+	for groupName, group in pairs(LibModuleDBShare.groups) do
+		if group.members[newDB] ~= nil then
+			error("Usage: DBGroup:AddDB(newDB): 'newDB' is already a member of group '"..groupName.."'.", 2);
+		end
 	end
 	-- record current profile
 	local syncProfile = self.syncDB:GetCurrentProfile();

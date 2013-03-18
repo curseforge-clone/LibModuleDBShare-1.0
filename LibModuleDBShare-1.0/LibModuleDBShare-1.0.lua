@@ -13,9 +13,6 @@ if not LibModuleDBShare then return end -- No upgrade needed
 -- Lua functions
 local error, type, pairs, time = error, type, pairs, time;
 
--- Blizzard functions
-local GetActiveSpecGroup = GetActiveSpecGroup;
-
 -- Required Libraries
 local AceDB = LibStub("AceDB-3.0");
 local AceDBOptions = LibStub("AceDBOptions-3.0");
@@ -96,13 +93,11 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 		group.profileTimestamp = 0;
 	end
 	if usesDualSpec and storedData.altProfile then
-		group.syncDB:SetDualSpecProfile(storedData.altProfile);
-		group.syncDB:SetDualSpecEnabled(storedData.dualSpecEnabled);
-		if storedData.dualSpecEnabled and storedData.activeSpecGroup ~= GetActiveSpecGroup() then
-			group.syncDB:SetDualSpecProfile(group.syncDB:GetCurrentProfile());
-			group.syncDB:SetProfile(storedData.altProfile);
-			initialDB:SetProfile(storedData.altProfile);
-		end
+		namespace = group.syncDB:GetNamespace("LibDualSpec-1.0");
+		namespace.char.enabled = storedData.dualSpecEnabled;
+		namespace.char.profile = storedData.altProfile;
+		namespace.char.specGroup = storedData.activeSpecGroup;
+		group.syncDB:CheckDualSpecState();
 	end
 	-- add methods and callbacks
 	for k, v in pairs(DBGroup) do
@@ -156,14 +151,12 @@ function DBGroup:AddDB(newDB)
 		self.squelchCallbacks = false;
 		self.syncDB:SetProfile(newDB:GetCurrentProfile());
 		self.profileTimestamp = storedData.logoutTimestamp;
-		if self.usesDualSpec and storedData.altProfile then
-			self.syncDB:SetDualSpecProfile(storedData.altProfile);
-			self.syncDB:SetDualSpecEnabled(storedData.dualSpecEnabled);
-			if storedData.dualSpecEnabled and storedData.activeSpecGroup ~= GetActiveSpecGroup() then
-				self.syncDB:SetDualSpecProfile(self.syncDB:GetCurrentProfile());
-				self.syncDB:SetProfile(storedData.altProfile);
-				newDB:SetProfile(storedData.altProfile);
-			end
+		if usesDualSpec and storedData.altProfile then
+			namespace = group.syncDB:GetNamespace("LibDualSpec-1.0");
+			namespace.char.enabled = storedData.dualSpecEnabled;
+			namespace.char.profile = storedData.altProfile;
+			namespace.char.specGroup = storedData.activeSpecGroup;
+			group.syncDB:CheckDualSpecState();
 		end
 	else
 		self.syncDB:SetProfile(syncProfile);

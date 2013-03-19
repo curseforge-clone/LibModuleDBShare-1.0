@@ -1,11 +1,33 @@
---- **LibModuleDBShare-1.0**\\ 
--- A description will eventually be here.
+--- **LibModuleDBShare-1.0** provides a shared profile manager for addons without a central core.
+-- A basic options panel for the group is added to the Blizzard options panel, as well as a
+-- standard profile manager as a subpanel. Changes through the profiles panel are propagated
+-- to member databases. The root panel can be used as a parent for your module config panels,
+-- to keep all your addon's config in one place. The root panel's name is the same as the group's
+-- name.\\
+-- \\
+-- A group can be created using the ':NewGroup' library method. The returned object inherits
+-- the ':AddDB' method of the DBGroup object described below.\\
+-- \\
+-- **LibDualSpec Support**\\
+-- LibModuleDBShare can use LibDualSpec to manage automatic profile switching with talent spec
+-- changes. This integration is handled by the library; there is no need to use LibDualSpec
+-- on member databases directly. 
 --
 -- @usage
--- Also coming soon.
+-- local database;
+-- -- this function is called after the ADDON_LOADED event fires
+-- function initializeDB()
+--     database = LibStub("AceDB-3.0"):New("MyAddonDB", defaults, true);
+--     local group = LibStub("LibModuleDBShare-1.0"):GetGroup("Group Name");
+--     if not group then
+--         group = LibStub("LibModuleDBShare-1.0"):NewGroup("Group Name", "A description for this group.", database);
+--     else
+--         group:AddDB(database);
+--     end
+-- end
 -- @class file
--- @name LibModuleDBShare-1.0.lua
-local MAJOR, MINOR = "LibModuleDBShare-1.0", 1
+-- @name LibModuleDBShare-1.0
+local MAJOR, MINOR = "LibModuleDBShare-1.0", 2
 local LibModuleDBShare, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not LibModuleDBShare then return end -- No upgrade needed
@@ -27,13 +49,15 @@ LibModuleDBShare.groups = LibModuleDBShare.groups or {};
 local DBGroup = {};
 
 --- Creates a new DB group.
--- @param groupName The name of the new DB group.
+-- @param groupName The name of the new DB group, as shown in the options panel.
 -- @param groupDescription A description of the group to be shown in the root options panel.
 -- @param initialDB The first DB to add to the group.
 -- @param usesDualSpec True if this group should use LibDualSpec, false otherwise.
 -- @usage
--- local myAddonDBGroup = LibStub("LibModuleDBShare-1.0"):NewGroup("MyAddonGroupName", true)
+-- local myDB = LibStub("AceDB-3.0"):New("MySavedVar");
+-- local myAddonDBGroup = LibStub("LibModuleDBShare-1.0"):NewGroup("MyAddonGroupName", "MyDescription", myDB, true)
 -- @return the new DB group object
+-- @name LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB[, usesDualSpec]);
 function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec)
 	-- verify parameters
 	if type(groupName) ~= "string" then
@@ -233,5 +257,12 @@ function DBGroup:OnMemberShutdown(callback, db)
 		self.members[db].char.altProfile = altProfile;
 		self.members[db].char.dualSpecEnabled = dualSpecEnabled;
 		self.members[db].char.activeSpecGroup = activeSpecGroup;
+	end
+end
+
+-- update existing groups
+for groupName, group in pairs(LibModuleDBShare.groups) do
+	for funcName, func in pairs(DBGroup) do
+		group[funcName] = func;
 	end
 end

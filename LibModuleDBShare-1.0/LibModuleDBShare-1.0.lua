@@ -5,8 +5,8 @@
 -- to keep all your addon's config in one place. The root panel's name is the same as the group's
 -- name.\\
 -- \\
--- A group can be created using the ':NewGroup' library method. The returned object inherits
--- the ':AddDB' method of the DBGroup object described below.\\
+-- A group can be created using the ':NewGroup' library method. The returned object inherits all
+-- methods of the DBGroup object described below.\\
 -- \\
 -- **LibDualSpec Support**\\
 -- LibModuleDBShare can use LibDualSpec to manage automatic profile switching with talent spec
@@ -27,7 +27,7 @@
 -- end
 -- @class file
 -- @name LibModuleDBShare-1.0
-local MAJOR, MINOR = "LibModuleDBShare-1.0", 2
+local MAJOR, MINOR = "LibModuleDBShare-1.0", 3
 local LibModuleDBShare, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not LibModuleDBShare then return end -- No upgrade needed
@@ -59,6 +59,10 @@ local DBGroup = {};
 -- @return the new DB group object
 -- @name LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB[, usesDualSpec]);
 function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec)
+	-- check to see if LibDualSpec has been loaded
+	if not LibDualSpec then
+		LibDualSpec = LibStub("LibDualSpec-1.0", true);
+	end
 	-- verify parameters
 	if type(groupName) ~= "string" then
 		error("Usage: LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec): 'groupName' must be a string.", 2);
@@ -118,12 +122,16 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 	else
 		group.profileTimestamp = 0;
 	end
-	if usesDualSpec and storedData.altProfile then
-		namespace = group.syncDB:GetNamespace("LibDualSpec-1.0");
-		namespace.char.enabled = storedData.dualSpecEnabled;
-		namespace.char.profile = storedData.altProfile;
-		namespace.char.specGroup = storedData.activeSpecGroup;
+	if usesDualSpec then
+		local LDSnamespace = group.syncDB:GetNamespace("LibDualSpec-1.0");
+		LDSnamespace.char.enabled = storedData.dualSpecEnabled;
+		LDSnamespace.char.profile = storedData.altProfile;
+		LDSnamespace.char.specGroup = storedData.activeSpecGroup;
 		group.syncDB:CheckDualSpecState();
+	else
+		group.syncDB.char.enabled = storedData.dualSpecEnabled;
+		group.syncDB.char.profile = storedData.altProfile;
+		group.syncDB.char.specGroup = storedData.activeSpecGroup;
 	end
 	-- add methods and callbacks
 	for k, v in pairs(DBGroup) do
@@ -144,7 +152,7 @@ end
 -- @param groupName The name of the DB group to retrieve.
 -- @usage
 -- local myAddonDBGroup = LibStub("LibModuleDBShare-1.0"):GetGroup("MyAddonGroupName")
--- @return the DB group object, or nil if not found
+-- @return the DB group object, or ##nil## if not found
 function LibModuleDBShare:GetGroup(groupName)
 	if type(groupName) ~= "string" then
 		error("Usage: LibModuleDBShare:GetGroup(groupName): 'groupName' must be a string.", 2);
@@ -184,12 +192,16 @@ function DBGroup:AddDB(newDB)
 		self.squelchCallbacks = false;
 		self.syncDB:SetProfile(newDB:GetCurrentProfile());
 		self.profileTimestamp = storedData.logoutTimestamp;
-		if usesDualSpec and storedData.altProfile then
-			namespace = group.syncDB:GetNamespace("LibDualSpec-1.0");
-			namespace.char.enabled = storedData.dualSpecEnabled;
-			namespace.char.profile = storedData.altProfile;
-			namespace.char.specGroup = storedData.activeSpecGroup;
+		if self.usesDualSpec and storedData.altProfile then
+			local LDSnamespace = group.syncDB:GetNamespace("LibDualSpec-1.0");
+			LDSnamespace.char.enabled = storedData.dualSpecEnabled;
+			LDSnamespace.char.profile = storedData.altProfile;
+			LDSnamespace.char.specGroup = storedData.activeSpecGroup;
 			group.syncDB:CheckDualSpecState();
+		elseif storedData.altProfile then
+			self.syncDB.char.enabled = storedData.dualSpecEnabled;
+			self.syncDB.char.profile = storedData.altProfile;
+			self.syncDB.char.specGroup = storedData.activeSpecGroup;
 		end
 	else
 		self.syncDB:SetProfile(syncProfile);
@@ -199,6 +211,29 @@ function DBGroup:AddDB(newDB)
 	-- add to members list
 	self.members[newDB] = namespace;
 	newDB.RegisterCallback(self, "OnDatabaseShutdown", "OnMemberShutdown");
+end
+
+--- Checks to see if this group uses LibDualSpec.
+-- @return ##true## if this group uses LibDualSpec, ##false## otherwise
+function DBGroup:IsUsingDualSpec()
+	return self.usesDualSpec;
+end
+
+--- Enables dual spec support if not already enabled.
+function DBGroup:EnableDualSpec()
+	if not LibDualSpec then
+		LibDualSpec = LibStub("LibDualSpec-1.0"); -- this will error if LDS isn't found
+	end
+	if not self.usesDualSpec then
+		LibDualSpec:EnhanceDatabase(self.syncDB, self.name);
+		LibDualSpec:EnhanceOptions(self.profileOptionsTable, self.syncDB);
+		self.usesDualSpec = true;
+		local namespace = self.syncDB:GetNamespace("LibDualSpec-1.0");
+		namespace.char.enabled = self.syncDB.char.enabled;
+		namespace.char.profile = self.syncDB.char.profile;
+		namespace.char.specGroup = self.syncDB.char.specGroup;
+		self.syncDB:CheckDualSpecState();
+	end
 end
 
 -- callback handlers (new profiles are handled by OnProfileChanged)

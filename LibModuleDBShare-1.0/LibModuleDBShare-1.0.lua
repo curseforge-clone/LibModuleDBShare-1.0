@@ -27,7 +27,7 @@
 -- end
 -- @class file
 -- @name LibModuleDBShare-1.0
-local MAJOR, MINOR = "LibModuleDBShare-1.0", 3
+local MAJOR, MINOR = "LibModuleDBShare-1.0", 4
 local LibModuleDBShare, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not LibModuleDBShare then return end -- No upgrade needed
@@ -227,6 +227,7 @@ function DBGroup:EnableDualSpec()
 	if not self.usesDualSpec then
 		LibDualSpec:EnhanceDatabase(self.syncDB, self.name);
 		LibDualSpec:EnhanceOptions(self.profileOptionsTable, self.syncDB);
+		AceConfigRegistry:NotifyChange(self.name.."Profiles");
 		self.usesDualSpec = true;
 		local namespace = self.syncDB:GetNamespace("LibDualSpec-1.0");
 		namespace.char.enabled = self.syncDB.char.enabled;
@@ -282,13 +283,13 @@ function DBGroup:OnMemberShutdown(callback, db)
 	if not timestamp then	-- ensure uniform timestamps to minimize
 		timestamp = time();	-- calls to SetProfile in NewGroup
 	end
+	self.members[db].char.logoutTimestamp = timestamp;
 	if self.usesDualSpec then
 		if not altProfile then
 			altProfile = self.syncDB:GetDualSpecProfile();
 			dualSpecEnabled = self.syncDB:IsDualSpecEnabled();
 			activeSpecGroup = GetActiveSpecGroup();
 		end
-		self.members[db].char.logoutTimestamp = timestamp;
 		self.members[db].char.altProfile = altProfile;
 		self.members[db].char.dualSpecEnabled = dualSpecEnabled;
 		self.members[db].char.activeSpecGroup = activeSpecGroup;

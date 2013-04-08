@@ -27,7 +27,7 @@
 -- end
 -- @class file
 -- @name LibModuleDBShare-1.0
-local MAJOR, MINOR = "LibModuleDBShare-1.0", 4
+local MAJOR, MINOR = "LibModuleDBShare-1.0", 5
 local LibModuleDBShare, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not LibModuleDBShare then return end -- No upgrade needed
@@ -213,6 +213,8 @@ function DBGroup:AddDB(newDB)
 	newDB.RegisterCallback(self, "OnDatabaseShutdown", "OnMemberShutdown");
 end
 
+-- LibDualSpec support
+
 --- Checks to see if this group uses LibDualSpec.
 -- @return ##true## if this group uses LibDualSpec, ##false## otherwise
 function DBGroup:IsUsingDualSpec()
@@ -235,6 +237,103 @@ function DBGroup:EnableDualSpec()
 		namespace.char.specGroup = self.syncDB.char.specGroup;
 		self.syncDB:CheckDualSpecState();
 	end
+end
+
+-- slash command support
+
+--- Adds a slash command to the group.
+-- @name DBGroup:EnableSlashCommand(slug, commandList[, handler])
+function DBGroup:EnableSlashCommand(slug, commandList, handler)
+	if self.slug then
+		error("Usage: DBGroup:EnableSlashCommand(slug, commandList[, handler]): group already has a slash command.", 2);
+	elseif type(slug) ~= "string" then
+		error("Usage: DBGroup:EnableSlashCommand(slug, commandList[, handler]): 'slug' must be a string.", 2);
+	elseif type(commandList) ~= "string" and type(commandList) ~= "table" then
+		error("Usage: DBGroup:EnableSlashCommand(slug, commandList[, handler]): 'commandList' must be a string or table.", 2);
+	elseif handler and type(handler) ~= "function" then
+		error("Usage: DBGroup:EnableSlashCommand(slug, commandList[, handler]): 'handler' must be nil or a function.", 2);
+	elseif type(commandList) == "table" then
+		for i = 1, #commandList do
+			if type(commandList[i]) ~= "string" then
+				error("Usage: DBGroup:EnableSlashCommand(slug, commandList[, handler]): 'commandList' must contain only strings.", 2);
+			end
+		end
+	end
+	
+	self.slug = slug;
+	self.slashCmdHandler = handler;
+	self.subCmdList = {};
+	if type(commandList) == "string" then
+		_G["SLASH_"..slug.."1"] = commandList;
+	else
+		for i = 1, #commandList do
+			_G["SLASH_"..slug..i] = commandList[i];
+		end
+	end
+	
+	SlashCmdList[slug] = function(msg, editBox)
+		if self.slashCmdHandler then
+			self.slashCmdHandler(msg, editBox);
+			return;
+		end
+		
+		for cmd, func in pairs(self.subCmdList) do
+			if msg == cmd then
+				func("", editBox);
+				return;
+			elseif msg:len() > cmd:len() then
+				if msg:sub(1, cmd:len() + 1) == (cmd.." ") then
+					func(msg:sub(cmd:len() + 2), editBox);
+					return;
+				end
+			end
+		end
+		
+		for k, button in pairs(InterfaceOptionsFrameAddOns.buttons) do
+			if button.element.name == self.name and button.element.collapsed then
+				OptionsListButtonToggle_OnClick(button.toggle);
+				break;
+			end
+		end
+		InterfaceOptionsFrame_OpenToCategory(self.name);
+	end;
+end
+
+--- Adds an alias for the slash command
+function DBGroup:AddSlashCommandAlias(alias)
+	if type(alias) ~= "string" then
+		error("Usage: DBGroup:AddSlashCommandAlias(alias): 'alias' must be a string.", 2);
+	elseif not self.slug then
+		error("Usage: DBGroup:AddSlashCommandAlias(alias): slash commands for this group have not be enabled.", 2);
+	end
+	
+	local i = 1;
+	while _G["SLASH_"..self.slug..i] do
+		if _G["SLASH_"..self.slug..i] == alias then
+			error("Usage: DBGroup:AddSlashCommandAlias(alias): 'alias' is already added.", 2);
+		end
+		i = i + 1;
+	end
+	
+	_G["SLASH_"..self.slug..i] = alias;
+end
+
+--- Adds a secondary command handler to the slash command for this group.
+function DBGroup:AddSecondaryCommand(name, handler)
+	if type(name) ~= "string" then
+		error("Usage: DBGroup:AddSecondaryCommand(name, handler): 'name' must be a string.", 2);
+	elseif type(name) ~= "function" then
+		error("Usage: DBGroup:AddSecondaryCommand(name, handler): 'handler' must be a function.", 2);
+	elseif not self.slashCmdList then
+		error("Usage: DBGroup:AddSecondaryCommand(name, handler): slash commands for this group have not be enabled.", 2);
+	end
+	for k, v in pairs(self.subCmdList) do
+		if k == name then
+			error("Usage: DBGroup:AddSecondaryCommand(name, func): command '"..name.."' already exists.", 2);
+		end
+	end
+	
+	self.subCmdList[name] = handler;
 end
 
 -- callback handlers (new profiles are handled by OnProfileChanged)

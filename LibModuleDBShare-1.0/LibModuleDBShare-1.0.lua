@@ -17,7 +17,8 @@
 -- LibModuleDBShare can associate a slash command with a DBGroup. The default handler function
 -- for the slash command opens the root options panel.\\
 -- Additional handler functions can be registered to respond to specific arguments given to the
--- slash command.
+-- slash command. If you provide a custom handler function for the slash command, that function
+-- is responsible for detecting secondary commands.
 --
 -- @usage
 -- local database;
@@ -64,7 +65,7 @@ local DBGroup = {};
 -- @param groupDescription A description of the group to be shown in the root options panel. (string)
 -- @param initialDB The first DB to add to the group. (table)
 -- @param usesDualSpec True if this group should use LibDualSpec, false otherwise. (boolean or nil)
--- @return the new DB group object
+-- @return the new DB group object (table)
 function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec)
 	-- check to see if LibDualSpec has been loaded
 	if not LibDualSpec then
@@ -157,7 +158,7 @@ end
 
 --- Retrieves an existing DB group.
 -- @param groupName The name of the DB group to retrieve. (string)
--- @return the DB group object, or ##nil## if not found
+-- @return the DB group object, or ##nil## if not found (table)
 function LibModuleDBShare:GetGroup(groupName)
 	if type(groupName) ~= "string" then
 		error("Usage: LibModuleDBShare:GetGroup(groupName): 'groupName' must be a string.", 2);
@@ -219,7 +220,7 @@ end
 -- LibDualSpec support
 
 --- Checks to see if this group uses LibDualSpec.
--- @return ##true## if this group uses LibDualSpec, ##false## otherwise
+-- @return ##true## if this group uses LibDualSpec, ##false## otherwise (boolean)
 function DBGroup:IsUsingDualSpec()
 	return self.usesDualSpec;
 end
@@ -305,7 +306,7 @@ function DBGroup:EnableSlashCommand(slug, commandList, handler)
 end
 
 --- Checks to see if this group has a slash command.
--- @return ##true## if this group has a slash command, ##false## otherwise
+-- @return ##true## if this group has a slash command, ##false## otherwise (boolean)
 function DBGroup:HasSlashCommand()
 	if self.slug then
 		return true;
@@ -357,6 +358,15 @@ function DBGroup:AddSecondaryCommand(name, handler, silent)
 	end
 		
 	self.subCmdList[name] = handler;
+end
+
+--- Returns the list of secondary commands registered with this group.
+-- @return A table containing name-function pairs for secondary commands. (table)
+function DBGroup:GetSecondaryCommands()
+	if not self.slug then
+		error("Usage: DBGroup:GetSecondaryCommands(): Slash commands for this group have not been enabled", 2);
+	end
+	return self.subCmdList;
 end
 
 -- callback handlers (new profiles are handled by OnProfileChanged)

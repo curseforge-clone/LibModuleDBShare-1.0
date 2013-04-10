@@ -11,7 +11,13 @@
 -- **LibDualSpec Support**\\
 -- LibModuleDBShare can use LibDualSpec to manage automatic profile switching with talent spec
 -- changes. This integration is handled by the library; there is no need to use LibDualSpec
--- on member databases directly. 
+-- on member databases directly.\\
+-- \\
+-- **Slash Command Support**\\
+-- LibModuleDBShare can associate a slash command with a DBGroup. The default handler function
+-- for the slash command opens the root options panel.\\
+-- Additional handler functions can be registered to respond to specific arguments given to the
+-- slash command.
 --
 -- @usage
 -- local database;
@@ -23,6 +29,10 @@
 --         group = LibStub("LibModuleDBShare-1.0"):NewGroup("Group Name", "A description for this group.", database);
 --     else
 --         group:AddDB(database);
+--     end
+--     -- if you want to add a slash command
+--     if not group:HasSlashCommand() then
+--         group:EnableSlashCommand("COMMAND_NAME", "/groupname");
 --     end
 -- end
 -- @class file
@@ -49,13 +59,10 @@ LibModuleDBShare.groups = LibModuleDBShare.groups or {};
 local DBGroup = {};
 
 --- Creates a new DB group.
--- @param groupName The name of the new DB group, as shown in the options panel.
--- @param groupDescription A description of the group to be shown in the root options panel.
--- @param initialDB The first DB to add to the group.
--- @param usesDualSpec True if this group should use LibDualSpec, false otherwise.
--- @usage
--- local myDB = LibStub("AceDB-3.0"):New("MySavedVar");
--- local myAddonDBGroup = LibStub("LibModuleDBShare-1.0"):NewGroup("MyAddonGroupName", "MyDescription", myDB, true)
+-- @param groupName The name of the new DB group, as shown in the options panel. (string)
+-- @param groupDescription A description of the group to be shown in the root options panel. (string)
+-- @param initialDB The first DB to add to the group. (table)
+-- @param usesDualSpec True if this group should use LibDualSpec, false otherwise. (boolean or nil)
 -- @return the new DB group object
 -- @name LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB[, usesDualSpec]);
 function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec)
@@ -149,9 +156,7 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 end
 
 --- Retrieves an existing DB group.
--- @param groupName The name of the DB group to retrieve.
--- @usage
--- local myAddonDBGroup = LibStub("LibModuleDBShare-1.0"):GetGroup("MyAddonGroupName")
+-- @param groupName The name of the DB group to retrieve. (string)
 -- @return the DB group object, or ##nil## if not found
 function LibModuleDBShare:GetGroup(groupName)
 	if type(groupName) ~= "string" then
@@ -161,9 +166,7 @@ function LibModuleDBShare:GetGroup(groupName)
 end
 
 --- Adds a database to the group.
--- @param newDB The database to add.
--- @usage
--- myAddonDBGroup:AddDB(MyAddon.db)
+-- @param newDB The database to add. (table)
 function DBGroup:AddDB(newDB)
 	-- verify parameters
 	if type(newDB) ~= "table" or not AceDB.db_registry[newDB] then
@@ -242,6 +245,10 @@ end
 -- slash command support
 
 --- Adds a slash command to the group.
+-- @param slug The base identifier to use for the slash command. (string)
+-- @param commandList The command itself, or a list of commands to use. (string or table)
+-- @param handler A handler function for the command. If nil, defaults to a function that
+-- calls the appropriate secondary command, or opens the root options panel. (function)
 -- @name DBGroup:EnableSlashCommand(slug, commandList[, handler])
 function DBGroup:EnableSlashCommand(slug, commandList, handler)
 	if self.slug then
@@ -261,7 +268,6 @@ function DBGroup:EnableSlashCommand(slug, commandList, handler)
 	end
 	
 	self.slug = slug;
-	self.slashCmdHandler = handler;
 	self.subCmdList = {};
 	if type(commandList) == "string" then
 		_G["SLASH_"..slug.."1"] = commandList;
@@ -271,35 +277,45 @@ function DBGroup:EnableSlashCommand(slug, commandList, handler)
 		end
 	end
 	
-	SlashCmdList[slug] = function(msg, editBox)
-		if self.slashCmdHandler then
-			self.slashCmdHandler(msg, editBox);
-			return;
-		end
-		
-		for cmd, func in pairs(self.subCmdList) do
-			if msg == cmd then
-				func("", editBox);
-				return;
-			elseif msg:len() > cmd:len() then
-				if msg:sub(1, cmd:len() + 1) == (cmd.." ") then
-					func(msg:sub(cmd:len() + 2), editBox);
+	if handler then
+		SlashCmdList[slug] = handler;
+	else
+		SlashCmdList[slug] = function(msg, editBox)
+			for cmd, func in pairs(self.subCmdList) do
+				if msg == cmd then
+					func("", editBox);
 					return;
+				elseif msg:len() > cmd:len() then
+					if msg:sub(1, cmd:len() + 1) == (cmd.." ") then
+						func(msg:sub(cmd:len() + 2), editBox);
+						return;
+					end
 				end
 			end
-		end
 		
-		for k, button in pairs(InterfaceOptionsFrameAddOns.buttons) do
-			if button.element.name == self.name and button.element.collapsed then
-				OptionsListButtonToggle_OnClick(button.toggle);
-				break;
+			for k, button in pairs(InterfaceOptionsFrameAddOns.buttons) do
+				if button.element.name == self.name and button.element.collapsed then
+					OptionsListButtonToggle_OnClick(button.toggle);
+					break;
+				end
 			end
-		end
-		InterfaceOptionsFrame_OpenToCategory(self.name);
-	end;
+			InterfaceOptionsFrame_OpenToCategory(self.name);
+		end;
+	end
 end
 
---- Adds an alias for the slash command
+--- Checks to see if this group has a slash command.
+-- @return ##true## if this group has a slash command, ##false## otherwise
+function DBGroup:HasSlashCommand()
+	if self.slug then
+		return true;
+	else
+		return false;
+	end
+end
+
+--- Adds an alias for the slash command.
+-- @param alias The alternate name for the slash command. (string)
 function DBGroup:AddSlashCommandAlias(alias)
 	if type(alias) ~= "string" then
 		error("Usage: DBGroup:AddSlashCommandAlias(alias): 'alias' must be a string.", 2);
@@ -310,7 +326,7 @@ function DBGroup:AddSlashCommandAlias(alias)
 	local i = 1;
 	while _G["SLASH_"..self.slug..i] do
 		if _G["SLASH_"..self.slug..i] == alias then
-			error("Usage: DBGroup:AddSlashCommandAlias(alias): 'alias' is already added.", 2);
+			error("Usage: DBGroup:AddSlashCommandAlias(alias): alias '"..alias.."' is already in use by this command.", 2);
 		end
 		i = i + 1;
 	end
@@ -319,20 +335,30 @@ function DBGroup:AddSlashCommandAlias(alias)
 end
 
 --- Adds a secondary command handler to the slash command for this group.
-function DBGroup:AddSecondaryCommand(name, handler)
+-- This handler will be called if the argument to the slash command matches the name provided.
+-- @param name The name of the secondary command. (string)
+-- @param handler The function to handle the command. (function)
+-- @param overwrite ##True## if you want to replace the currently registered command, ##false##
+-- otherwise. (boolean)
+-- @name DBGroup:AddSecondaryCommand(name, handler[, overwrite])
+function DBGroup:AddSecondaryCommand(name, handler, overwrite)
 	if type(name) ~= "string" then
-		error("Usage: DBGroup:AddSecondaryCommand(name, handler): 'name' must be a string.", 2);
+		error("Usage: DBGroup:AddSecondaryCommand(name, handler[, overwrite]): 'name' must be a string.", 2);
 	elseif type(name) ~= "function" then
-		error("Usage: DBGroup:AddSecondaryCommand(name, handler): 'handler' must be a function.", 2);
+		error("Usage: DBGroup:AddSecondaryCommand(name, handler[, overwrite]): 'handler' must be a function.", 2);
 	elseif not self.slashCmdList then
-		error("Usage: DBGroup:AddSecondaryCommand(name, handler): slash commands for this group have not be enabled.", 2);
+		error("Usage: DBGroup:AddSecondaryCommand(name, handler[, overwrite]): slash commands for this group have not be enabled.", 2);
+	elseif type(overwrite) ~= "boolean" and type(overwrite) ~= "nil" then
+		error("Usage: DBGroup:AddSecondaryCommand(name, handler[, overwrite]): 'overwrite' must be a boolean or nil", 2);
 	end
-	for k, v in pairs(self.subCmdList) do
-		if k == name then
-			error("Usage: DBGroup:AddSecondaryCommand(name, func): command '"..name.."' already exists.", 2);
+	if not overwrite then
+		for k, v in pairs(self.subCmdList) do
+			if k == name then
+				error("Usage: DBGroup:AddSecondaryCommand(name, handler[, overwrite]): command '"..name.."' already exists.", 2);
+			end
 		end
 	end
-	
+		
 	self.subCmdList[name] = handler;
 end
 

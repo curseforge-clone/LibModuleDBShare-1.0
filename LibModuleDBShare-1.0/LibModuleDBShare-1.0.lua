@@ -149,7 +149,7 @@ function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesD
 	group.syncDB.RegisterCallback(group, "OnProfileCopied", "OnProfileCopied");
 	group.syncDB.RegisterCallback(group, "OnProfileReset", "OnProfileReset");
 	group.syncDB.RegisterCallback(group, "OnDatabaseShutdown", "OnSyncShutdown");
-	initialDB.RegisterCallback(group, "OnDatabaseShutdown", "OnMemberShutdown");
+	group.members[initialDB].RegisterCallback(group, "OnDatabaseShutdown", "OnMemberShutdown"); -- register the namespace, not the base db
 	group.squelchCallbacks = false;
 	LibModuleDBShare.groups[groupName] = group;
 	return group;
@@ -213,7 +213,7 @@ function DBGroup:AddDB(newDB)
 	end
 	-- add to members list
 	self.members[newDB] = namespace;
-	newDB.RegisterCallback(self, "OnDatabaseShutdown", "OnMemberShutdown");
+	namespace.RegisterCallback(self, "OnDatabaseShutdown", "OnMemberShutdown"); -- register the namespace, not the base db
 end
 
 -- LibDualSpec support
@@ -408,16 +408,16 @@ function DBGroup:OnMemberShutdown(callback, db)
 	if not timestamp then	-- ensure uniform timestamps to minimize
 		timestamp = time();	-- calls to SetProfile in NewGroup
 	end
-	self.members[db].char.logoutTimestamp = timestamp;
+	db.char.logoutTimestamp = timestamp; -- namespace is registered for callback, not base db
 	if self.usesDualSpec then
 		if not altProfile then
 			altProfile = self.syncDB:GetDualSpecProfile();
 			dualSpecEnabled = self.syncDB:IsDualSpecEnabled();
 			activeSpecGroup = GetActiveSpecGroup();
 		end
-		self.members[db].char.altProfile = altProfile;
-		self.members[db].char.dualSpecEnabled = dualSpecEnabled;
-		self.members[db].char.activeSpecGroup = activeSpecGroup;
+		db.char.altProfile = altProfile;
+		db.char.dualSpecEnabled = dualSpecEnabled;
+		db.char.activeSpecGroup = activeSpecGroup;
 	end
 end
 

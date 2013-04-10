@@ -59,12 +59,12 @@ LibModuleDBShare.groups = LibModuleDBShare.groups or {};
 local DBGroup = {};
 
 --- Creates a new DB group.
+-- @paramsig groupName, groupDescription, initialDB[, usesDualSpec]
 -- @param groupName The name of the new DB group, as shown in the options panel. (string)
 -- @param groupDescription A description of the group to be shown in the root options panel. (string)
 -- @param initialDB The first DB to add to the group. (table)
 -- @param usesDualSpec True if this group should use LibDualSpec, false otherwise. (boolean or nil)
 -- @return the new DB group object
--- @name LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB[, usesDualSpec]);
 function LibModuleDBShare:NewGroup(groupName, groupDescription, initialDB, usesDualSpec)
 	-- check to see if LibDualSpec has been loaded
 	if not LibDualSpec then
@@ -245,11 +245,11 @@ end
 -- slash command support
 
 --- Adds a slash command to the group.
+-- @paramsig slug, commandList[, handler]
 -- @param slug The base identifier to use for the slash command. (string)
 -- @param commandList The command itself, or a list of commands to use. (string or table)
 -- @param handler A handler function for the command. If nil, defaults to a function that
 -- calls the appropriate secondary command, or opens the root options panel. (function)
--- @name DBGroup:EnableSlashCommand(slug, commandList[, handler])
 function DBGroup:EnableSlashCommand(slug, commandList, handler)
 	if self.slug then
 		error("Usage: DBGroup:EnableSlashCommand(slug, commandList[, handler]): group already has a slash command.", 2);
@@ -336,22 +336,22 @@ end
 
 --- Adds a secondary command handler to the slash command for this group.
 -- This handler will be called if the argument to the slash command matches the name provided.
+-- @paramsig name, handler[, silent]
 -- @param name The name of the secondary command. (string)
 -- @param handler The function to handle the command. (function)
--- @param overwrite ##True## if you want to replace the currently registered command, ##false##
+-- @param silent ##True## if you want to replace the currently registered command, ##false##
 -- otherwise. (boolean)
--- @name DBGroup:AddSecondaryCommand(name, handler[, overwrite])
-function DBGroup:AddSecondaryCommand(name, handler, overwrite)
+function DBGroup:AddSecondaryCommand(name, handler, silent)
 	if type(name) ~= "string" then
 		error("Usage: DBGroup:AddSecondaryCommand(name, handler[, overwrite]): 'name' must be a string.", 2);
-	elseif type(name) ~= "function" then
+	elseif type(handler) ~= "function" then
 		error("Usage: DBGroup:AddSecondaryCommand(name, handler[, overwrite]): 'handler' must be a function.", 2);
-	elseif not self.slashCmdList then
+	elseif not self.slug then
 		error("Usage: DBGroup:AddSecondaryCommand(name, handler[, overwrite]): slash commands for this group have not be enabled.", 2);
 	elseif type(overwrite) ~= "boolean" and type(overwrite) ~= "nil" then
 		error("Usage: DBGroup:AddSecondaryCommand(name, handler[, overwrite]): 'overwrite' must be a boolean or nil", 2);
 	end
-	if not overwrite then
+	if not silent then
 		for k, v in pairs(self.subCmdList) do
 			if k == name then
 				error("Usage: DBGroup:AddSecondaryCommand(name, handler[, overwrite]): command '"..name.."' already exists.", 2);
@@ -389,6 +389,8 @@ function DBGroup:OnProfileReset(callback, syncDB)
 		db:ResetProfile(false, false);
 	end
 end
+
+-- shutdown handling
 
 local altProfile = nil;
 local dualSpecEnabled = nil;

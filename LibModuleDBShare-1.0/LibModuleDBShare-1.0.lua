@@ -325,9 +325,6 @@ function DBGroup:AddSlashCommandAlias(alias)
 	
 	local i = 1;
 	while _G["SLASH_"..self.slug..i] do
-		if _G["SLASH_"..self.slug..i] == alias then
-			error("Usage: DBGroup:AddSlashCommandAlias(alias): alias '"..alias.."' is already in use by this command.", 2);
-		end
 		i = i + 1;
 	end
 	

@@ -295,7 +295,7 @@ function DBGroup:EnableSlashCommand(slug, commandList, handler)
 			end
 		
 			for k, button in pairs(InterfaceOptionsFrameAddOns.buttons) do
-				if button.element.name == self.name and button.element.collapsed then
+				if button.element and button.element.name == self.name and button.element.collapsed then
 					OptionsListButtonToggle_OnClick(button.toggle);
 					break;
 				end
